@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Costa Code - حجز الكورس</title>
+  <style>
+    :root {
+      --primary: #0070f3;
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --success: #22c55e;
+      --danger: #ef4444;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    h1, h2 { text-align: center; color: var(--primary); }
+    .card {
+      background: var(--card-bg);
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      margin-bottom: 25px;
+    }
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      box-sizing: border-box;
+      font-size: 16px;
+    }
+    input { background: #0f172a; color: white; }
+    button {
+      background: var(--primary);
+      color: white;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover { opacity: 0.9; }
+    
+    /* جدول طلبات المسؤول */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      border: 1px solid #334155;
+      padding: 10px;
+      text-align: center;
+    }
+    th { background: #0f172a; }
+    .btn-accept { background: var(--success); width: auto; padding: 6px 12px; margin: 2px; }
+    .btn-reject { background: var(--danger); width: auto; padding: 6px 12px; margin: 2px; }
+    .status-pending { color: #f59e0b; font-weight: bold; }
+    .status-accepted { color: var(--success); font-weight: bold; }
+    .status-rejected { color: var(--danger); font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 1. قسم الحجز للطلاب -->
+  <div class="card">
+    <h1>🚀 Costa Code</h1>
+    <p style="text-align: center;">انضم للدفعة الأولى وسجل بياناتك الآن للحجز!</p>
+    <form id="bookingForm">
+      <input type="text" id="studentName" placeholder="الاسم بالكامل" required>
+      <input type="tel" id="studentPhone" placeholder="رقم الواتساب / التليفون" required>
+      <button type="submit">تأكيد طلب الحجز</button>
+    </form>
+    <div id="bookingMsg" style="text-align:center; margin-top:10px;"></div>
+  </div>
+
+  <!-- 2. الاستعلام عن حالة الطلب للطالب -->
+  <div class="card">
+    <h3>🔍 الاستعلام عن حالة طلبك</h3>
+    <input type="tel" id="checkPhone" placeholder="أدخل رقم تليفونك للاستعلام">
+    <button onclick="checkStatus()">بحث عن الطلب</button>
+    <p id="statusResult" style="text-align: center; font-size: 18px;"></p>
+  </div>
+
+  <hr style="border-color: #334155; margin: 40px 0;">
+
+  <!-- 3. لوحة تحكم المسؤول (أنت فقط) -->
+  <div class="card">
+    <h2>🔒 لوحة تحكم Costa Code (للمسؤول)</h2>
+    <div id="loginBox">
+      <input type="password" id="adminPass" placeholder="أدخل كلمة السر الخاصة بك">
+      <button onclick="loginAdmin()">دخول لوحة التحكم</button>
+    </div>
+
+    <div id="adminPanel" style="display: none;">
+      <p style="color: var(--success); text-align: center;">مرحبًا بك في لوحة الإدارة! 👋</p>
+      <table>
+        <thead>
+          <tr>
+            <th>الاسم</th>
+            <th>الهاتف</th>
+            <th>الحالة</th>
+            <th>الإجراء</th>
+          </tr>
+        </thead>
+        <tbody id="requestsTable">
+          <!-- البيانات ستظهر هنا -->
+        </tbody>
+      </table>
+      <button onclick="logoutAdmin()" style="background: #64748b; margin-top: 15px;">تسجيل الخروج</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // باسورد لوحة التحكم الخاص بك (يمكنك تغييره من هنا)
+  const ADMIN_PASSWORD = "costa123password";
+
+  // استرجاع البيانات من ذاكرة المتصفح
+  function getRequests() {
+    return JSON.parse(localStorage.getItem('costa_requests')) || [];
+  }
+
+  function saveRequests(requests) {
+    localStorage.setItem('costa_requests', JSON.stringify(requests));
+  }
+
+  // تقديم طلب حجز جديد
+  document.getElementById('bookingForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const name = document.getElementById('studentName').value;
+    const phone = document.getElementById('studentPhone').value;
+
+    const requests = getRequests();
+    
+    // التاكد من عدم تكرار الرقم
+    const exists = requests.find(r => r.phone === phone);
+    if(exists) {
+      document.getElementById('bookingMsg').innerHTML = `<span style="color:var(--danger)">هذا الرقم مسجل بالفعل!</span>`;
+      return;
+    }
+
+    requests.push({ name, phone, status: 'معلق' });
+    saveRequests(requests);
+
+    document.getElementById('bookingMsg').innerHTML = `<span style="color:var(--success)">تم ارسال طلبك بنجاح! انتظر مراجعة المسؤول.</span>`;
+    this.reset();
+  });
+
+  // استعلام الطالب عن حالة طلبه
+  function checkStatus() {
+    const phone = document.getElementById('checkPhone').value;
+    const requests = getRequests();
+    const student = requests.find(r => r.phone === phone);
+
+    const result = document.getElementById('statusResult');
+    if (!student) {
+      result.innerHTML = `<span style="color:var(--danger)">لم يتم العثور على طلب بهذا الرقم.</span>`;
+    } else {
+      if (student.status === 'معلق') {
+        result.innerHTML = `حالة طلبك: <span class="status-pending">قيد المراجعة ⏳</span>`;
+      } else if (student.status === 'مقبول') {
+        result.innerHTML = `حالة طلبك: <span class="status-accepted">تم قبول طلبك بنجاح! 🎉 (سنتواصل معك قريباً)</span>`;
+      } else if (student.status === 'مرفوض') {
+        result.innerHTML = `حالة طلبك: <span class="status-rejected">عذراً، تم رفض الطلب ❌</span>`;
+      }
+    }
+  }
+
+  // تسجيل دخول الأدمن
+  function loginAdmin() {
+    const pass = document.getElementById('adminPass').value;
+    if (pass === ADMIN_PASSWORD) {
+      document.getElementById('loginBox').style.display = 'none';
+      document.getElementById('adminPanel').style.display = 'block';
+      loadAdminTable();
+    } else {
+      alert("كلمة السر غير صحيحة!");
+    }
+  }
+
+  function logoutAdmin() {
+    document.getElementById('loginBox').style.display = 'block';
+    document.getElementById('adminPanel').style.display = 'none';
+    document.getElementById('adminPass').value = '';
+  }
+
+  // تحميل جدول الطلبات للأدمن
+  function loadAdminTable() {
+    const requests = getRequests();
+    const tbody = document.getElementById('requestsTable');
+    tbody.innerHTML = '';
+
+    requests.forEach((req, index) => {
+      let statusClass = req.status === 'مقبول' ? 'status-accepted' : (req.status === 'مرفوض' ? 'status-rejected' : 'status-pending');
+      
+      tbody.innerHTML += `
+        <tr>
+          <td>${req.name}</td>
+          <td>${req.phone}</td>
+          <td class="${statusClass}">${req.status}</td>
+          <td>
+            <button class="btn-accept" onclick="updateStatus(${index}, 'مقبول')">قبول</button>
+            <button class="btn-reject" onclick="updateStatus(${index}, 'مرفوض')">رفض</button>
+          </td>
+        </tr>
+      `;
+    });
+  }
+
+  // تغيير حالة الطلب
+  function updateStatus(index, newStatus) {
+    const requests = getRequests();
+    requests[index].status = newStatus;
+    saveRequests(requests);
+    loadAdminTable();
+  }
+</script>
+
+</body>
+</html>
